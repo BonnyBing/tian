@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>天文望远镜全真模拟</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: #03060d; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #03060d;
+  height: 100vh; height: 100svh;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  color: #e2e8f0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Header ── */
+header {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 6px 16px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(3,6,13,0.95);
+}
+.page-title {
+  font-size: clamp(0.95rem, 3.5vw, 1.4rem);
+  font-weight: 700;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; letter-spacing: 0.02em;
+}
+.page-subtitle { color: #1e293b; font-size: 0.60rem; margin-top: 1px; }
+
+/* ── View Section ── */
+#view-section {
+  flex: 1; min-height: 0;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+#scene-canvas, #overlay-canvas {
+  position: absolute; top: 0; left: 0;
+  display: block;
+}
+#overlay-canvas { pointer-events: none; z-index: 2; }
+
+.focus-status {
+  position: absolute; bottom: 10px; left: 12px;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; color: #4b5563;
+  z-index: 10; pointer-events: none;
+}
+.focus-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #dc2626; transition: background 0.5s, box-shadow 0.5s;
+}
+.focus-dot.on { background: #16a34a; box-shadow: 0 0 6px #16a34a; }
+
+/* ── Scope Section ── */
+#scope-section {
+  flex-shrink: 0;
+  height: clamp(232px, 43vh, 300px);
+  background: linear-gradient(180deg, #060e1a 0%, #0a1525 100%);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 7px 13px 5px;
+  display: flex; flex-direction: column; gap: 0;
+  overflow: hidden;
+}
+
+/* ── Focus button (top of scope section) ── */
+.focus-top {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+}
+.focus-btn {
+  width: 100%;
+  padding: 7px 12px;
+  background: linear-gradient(135deg, #1d4ed8, #6d28d9);
+  border: none; border-radius: 8px; color: #fff;
+  font-size: 0.76rem; font-weight: 600; cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(29,78,216,0.35);
+  letter-spacing: 0.02em;
+}
+.focus-btn:hover:not(:disabled) { opacity: 0.9; box-shadow: 0 4px 14px rgba(29,78,216,0.5); }
+.focus-btn:active:not(:disabled) { transform: scale(0.99); }
+.focus-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+/* ── Mode toggle ── */
+.mode-row {
+  display: flex; gap: 6px;
+  flex-shrink: 0; margin-bottom: 5px;
+}
+.mode-btn {
+  flex: 1; padding: 5px 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  border-radius: 7px; color: #4b5563;
+  font-size: 0.70rem; font-weight: 600;
+  cursor: pointer; transition: all 0.18s;
+}
+.mode-btn:hover { background: rgba(255,255,255,0.07); color: #94a3b8; }
+.mode-btn.active {
+  background: rgba(96,165,250,0.12);
+  border-color: #60a5fa; color: #60a5fa;
+  box-shadow: 0 0 10px rgba(96,165,250,0.15);
+}
+
+/* Telescope wrap */
+.scope-wrap {
+  flex-shrink: 0; height: 82px; width: 100%;
+}
+.scope-wrap svg { overflow: visible; display: block; }
+
+/* Separator */
+.sep { height: 1px; background: rgba(255,255,255,0.06); flex-shrink: 0; margin: 5px 0; }
+
+/* Lens selector rows */
+.lens-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 2px 0; }
+.row-label { font-size: 0.63rem; color: #374151; width: 24px; text-align: center; flex-shrink: 0; line-height: 1.3; }
+.lens-options { display: flex; gap: 4px; flex: 1; }
+.lens-card {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 5px 2px 4px;
+  background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.07);
+  border-radius: 8px; cursor: pointer; min-width: 0;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.lens-card:hover { background: rgba(255,255,255,0.07); border-color: rgba(96,165,250,0.25); }
+.lens-card:active { transform: scale(0.93); }
+.lens-card.selected {
+  background: rgba(96,165,250,0.11); border-color: #60a5fa;
+  box-shadow: 0 0 10px rgba(96,165,250,0.22);
+}
+.lens-card.disabled { opacity: 0.28; pointer-events: none; }
+.lens-kind { font-size: 0.52rem; color: #2d3748; white-space: nowrap; }
+.lens-card.selected .lens-kind { color: #3b82f6; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-icon { display: inline-block; animation: spin 0.75s linear infinite; }
+
+@keyframes pulseRing { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+.focus-ring-anim {
+  position: absolute; border: 2px solid #60a5fa; border-radius: 50%;
+  pointer-events: none; z-index: 5; animation: pulseRing 0.9s ease-out forwards;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="page-title">天文望远镜全真模拟</div>
+  <div class="page-subtitle">切换目镜与物镜，体验不同倍率下的月球观测</div>
+</header>
+
+<div id="view-section">
+  <canvas id="scene-canvas"></canvas>
+  <canvas id="overlay-canvas"></canvas>
+  <div class="focus-status">
+    <div class="focus-dot" id="focus-dot"></div>
+    <span id="focus-text">未对焦</span>
+  </div>
+</div>
+
+<div id="scope-section">
+
+  <!-- Auto-focus button (topmost) -->
+  <div class="focus-top">
+    <button class="focus-btn" id="focus-btn" onclick="triggerFocus()">
+      <span id="focus-icon">⊙</span>
+      <span id="focus-label">自动对焦</span>
+    </button>
+  </div>
+
+  <!-- Mode toggle -->
+  <div class="mode-row">
+    <button class="mode-btn active" id="mode-scope-btn" onclick="setMode('scope')">🔭 望远镜</button>
+    <button class="mode-btn" id="mode-naked-btn" onclick="setMode('naked')">👁 肉眼观察</button>
+  </div>
+
+  <!-- Telescope SVG -->
+  <div class="scope-wrap">
+    <svg id="scope-svg" width="100%" height="82" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- Eyepiece selector (no numbers) -->
+  <div class="lens-row">
+    <div class="row-label">目<br>镜</div>
+    <div class="lens-options" id="ep-options"></div>
+  </div>
+
+  <!-- Objective selector (no numbers) -->
+  <div class="lens-row">
+    <div class="row-label">物<br>镜</div>
+    <div class="lens-options" id="obj-options"></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════
+   天文望远镜全真模拟  v3.0
+   ══════════════════════════════════════════════════════ */
+
+// ── Lens Data ────────────────────────────────────────
+// 焦距越短 → 镜片弯曲度越大 → 越厚（物理正确）
+const EYEPIECES = [
+  { f:  5, kind: '高倍', thick: 0.47 },  // 5mm  焦距最短 → 最厚（左）
+  { f: 10, kind: '中倍', thick: 0.30 },  // 10mm 中等
+  { f: 20, kind: '广角', thick: 0.15 }   // 20mm 焦距最长 → 最薄（右）
+];
+const OBJECTIVES = [
+  { f: 200, kind: '短焦', thick: 0.38 },  // 200mm 焦距最短 → 最厚
+  { f: 400, kind: '中焦', thick: 0.22 },  // 400mm 中等
+  { f: 800, kind: '长焦', thick: 0.10 }   // 800mm 焦距最长 → 最薄
+];
+
+// ── State ────────────────────────────────────────────
+const S = {
+  ep:      20,
+  obj:     200,
+  mode:    'scope',
+  focused: false,
+  focusing: false,
+  blur:    12
+};
+
+function getMag() { return S.obj / S.ep; }
+
+// ── Moon Images ──────────────────────────────────────
+const moonImg = [null, null, null];
+const IMG_MOON_R = [185, 270, 0];
+let imagesReady = 0;
+[1, 2, 3].forEach((n, i) => {
+  const img = new Image();
+  img.onload  = () => { moonImg[i] = img; imagesReady++; };
+  img.onerror = () => { imagesReady++; };
+  img.src = `${n}.jpg`;
+});
+
+// ── Canvas ───────────────────────────────────────────
+const sceneCvs   = document.getElementById('scene-canvas');
+const sceneCtx   = sceneCvs.getContext('2d');
+const overlayCvs = document.getElementById('overlay-canvas');
+const overlayCtx = overlayCvs.getContext('2d');
+let CW = 0, CH = 0, VR = 0;
+
+function resizeCanvases() {
+  const sec = document.getElementById('view-section');
+  CW = sec.clientWidth; CH = sec.clientHeight;
+  sceneCvs.width = overlayCvs.width = CW;
+  sceneCvs.height = overlayCvs.height = CH;
+  VR = Math.min(Math.min(CW, CH) * 0.43, 280);
+  drawOverlay();
+}
+
+// ── Seeded RNG ───────────────────────────────────────
+function makeRng(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = Math.imul(s ^ (s >>> 15), s | 1);
+    s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
+    return ((s ^ (s >>> 14)) >>> 0) / 0xFFFFFFFF;
+  };
+}
+
+// ── Telescope Stars ──────────────────────────────────
+const TELE_STARS = (() => {
+  const rng = makeRng(8765);
+  return Array.from({ length: 280 }, () => {
+    const a = rng() * Math.PI * 2, d = 0.55 + rng() * 3.0;
+    return { nx: Math.cos(a)*d, ny: Math.sin(a)*d, size: 0.3+rng()*1.2, bright: 0.18+rng()*0.72, tw: 0.6+rng()*2.5, tp: rng()*Math.PI*2 };
+  });
+})();
+
+// ── Naked Eye Stars ──────────────────────────────────
+const NAKED_STARS = (() => {
+  const rng = makeRng(13579);
+  const stars = [];
+  for (let i = 0; i < 520; i++) {
+    stars.push({ nx: rng()*2-1, ny: rng()*2-1, size: 0.2+Math.pow(rng(),2.5)*2.5, bright: 0.08+Math.pow(rng(),1.8)*0.72, tw: 0.4+rng()*3, tp: rng()*Math.PI*2, ci: Math.floor(rng()*12) });
+  }
+  const mwRng = makeRng(24680);
+  for (let i = 0; i < 600; i++) {
+    const t = mwRng()*2.4-1.2, perp = (mwRng()-0.5)*0.45;
+    const nx = t*0.88+perp*0.46, ny = t*0.22+perp*0.92-0.15;
+    if (Math.abs(nx)<1&&Math.abs(ny)<1) stars.push({nx,ny,size:0.2+mwRng()*0.4,bright:0.03+mwRng()*0.09,tw:0.3,tp:mwRng()*Math.PI*2,ci:0});
+  }
+  return stars;
+})();
+const STAR_COLORS = ['#b8d4ff','#c8dcff','#dce8ff','#eaf0ff','#ffffff','#ffffff','#ffffff','#fffce8','#fff4d0','#ffe8b4','#ffd0a0','#ffc090'];
+
+// ── Overlay ──────────────────────────────────────────
+function drawOverlay() {
+  if (!CW||!CH) return;
+  overlayCtx.clearRect(0,0,CW,CH);
+  const cx=CW/2, cy=CH/2;
+
+  if (S.mode==='naked') {
+    const vg = overlayCtx.createRadialGradient(cx,cy,Math.min(CW,CH)*0.3,cx,cy,Math.max(CW,CH)*0.72);
+    vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.55)');
+    overlayCtx.fillStyle=vg; overlayCtx.fillRect(0,0,CW,CH);
+    return;
+  }
+
+  // Black mask outside circle
+  overlayCtx.save();
+  overlayCtx.fillStyle='#000';
+  overlayCtx.beginPath();
+  overlayCtx.rect(0,0,CW,CH);
+  overlayCtx.arc(cx,cy,VR,0,Math.PI*2,true);
+  overlayCtx.fill('evenodd');
+
+  // Inner vignette
+  const vig = overlayCtx.createRadialGradient(cx,cy,VR*0.55,cx,cy,VR*0.97);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.62)');
+  overlayCtx.beginPath(); overlayCtx.arc(cx,cy,VR,0,Math.PI*2);
+  overlayCtx.fillStyle=vig; overlayCtx.fill();
+
+  // Chrome rings
+  [
+    {r:VR,     lw:2.0, c:'rgba(70,100,140,0.5)'},
+    {r:VR+5,   lw:9,   c:'rgba(15,24,40,0.97)'},
+    {r:VR+10,  lw:4,   c:'rgba(35,52,78,0.88)'},
+    {r:VR+13,  lw:1.5, c:'rgba(55,80,115,0.55)'},
+    {r:VR+15,  lw:0.8, c:'rgba(80,112,155,0.25)'}
+  ].forEach(({r,lw,c}) => {
+    overlayCtx.beginPath(); overlayCtx.arc(cx,cy,r,0,Math.PI*2);
+    overlayCtx.strokeStyle=c; overlayCtx.lineWidth=lw; overlayCtx.stroke();
+  });
+
+  // Glare arc
+  const arc = overlayCtx.createLinearGradient(cx-VR,cy-VR,cx+VR*0.5,cy-VR*0.3);
+  arc.addColorStop(0,'rgba(255,255,255,0)'); arc.addColorStop(0.35,'rgba(255,255,255,0.09)'); arc.addColorStop(1,'rgba(255,255,255,0)');
+  overlayCtx.beginPath(); overlayCtx.arc(cx,cy,VR+7,Math.PI*1.1,Math.PI*1.8);
+  overlayCtx.strokeStyle=arc; overlayCtx.lineWidth=8; overlayCtx.stroke();
+
+  // Crosshair
+  const chL=VR*0.07;
+  overlayCtx.setLineDash([2.5,3.5]);
+  overlayCtx.strokeStyle='rgba(255,255,255,0.055)'; overlayCtx.lineWidth=0.75;
+  overlayCtx.beginPath();
+  overlayCtx.moveTo(cx-chL,cy); overlayCtx.lineTo(cx+chL,cy);
+  overlayCtx.moveTo(cx,cy-chL); overlayCtx.lineTo(cx,cy+chL);
+  overlayCtx.stroke(); overlayCtx.setLineDash([]);
+  overlayCtx.restore();
+}
+
+// ── Scene Rendering ──────────────────────────────────
+function renderScene(ts) {
+  requestAnimationFrame(renderScene);
+  if (!CW||!CH) return;
+  const t=ts/1000;
+  sceneCtx.fillStyle='#000207';
+  sceneCtx.fillRect(0,0,CW,CH);
+  if (S.mode==='naked') renderNakedEye(t);
+  else renderTelescopeView(t);
+  sceneCvs.style.filter = S.blur>0.06 ? `blur(${S.blur.toFixed(2)}px)` : 'none';
+}
+
+function renderNakedEye(t) {
+  const cx=CW/2, cy=CH/2;
+  const sky=sceneCtx.createRadialGradient(cx,cy-CH*0.3,0,cx,cy,Math.max(CW,CH)*0.8);
+  sky.addColorStop(0,'#050a18'); sky.addColorStop(0.5,'#030710'); sky.addColorStop(1,'#010308');
+  sceneCtx.fillStyle=sky; sceneCtx.fillRect(0,0,CW,CH);
+  for (const s of NAKED_STARS) {
+    const sx=cx+s.nx*CW*0.52, sy=cy+s.ny*CH*0.52;
+    if (sx<-5||sx>CW+5||sy<-5||sy>CH+5) continue;
+    const tw=0.7+0.3*Math.sin(t*s.tw+s.tp);
+    sceneCtx.save(); sceneCtx.globalAlpha=s.bright*tw;
+    if (s.size>1.0&&s.bright>0.35) {
+      const glow=sceneCtx.createRadialGradient(sx,sy,0,sx,sy,s.size*3);
+      glow.addColorStop(0,STAR_COLORS[s.ci||0]); glow.addColorStop(1,'rgba(0,0,0,0)');
+      sceneCtx.beginPath(); sceneCtx.arc(sx,sy,s.size*3,0,Math.PI*2); sceneCtx.fillStyle=glow; sceneCtx.fill();
+    }
+    sceneCtx.beginPath(); sceneCtx.arc(sx,sy,s.size,0,Math.PI*2); sceneCtx.fillStyle=STAR_COLORS[s.ci||4]; sceneCtx.fill();
+    sceneCtx.restore();
+  }
+  const mr=Math.max(7,VR*0.04);
+  const mg=sceneCtx.createRadialGradient(CW/2,CH/2,0,CW/2,CH/2,mr*5);
+  mg.addColorStop(0,'rgba(255,252,230,0.9)'); mg.addColorStop(0.15,'rgba(255,252,230,0.6)');
+  mg.addColorStop(0.4,'rgba(240,235,200,0.18)'); mg.addColorStop(1,'rgba(0,0,0,0)');
+  sceneCtx.beginPath(); sceneCtx.arc(CW/2,CH/2,mr*5,0,Math.PI*2); sceneCtx.fillStyle=mg; sceneCtx.fill();
+  sceneCtx.beginPath(); sceneCtx.arc(CW/2,CH/2,mr,0,Math.PI*2); sceneCtx.fillStyle='#faf8ee'; sceneCtx.fill();
+}
+
+function renderTelescopeView(t) {
+  const cx=CW/2, cy=CH/2, mag=getMag();
+  const moonDispR=VR*0.17*(mag/10);
+  let img, moonImgR, useFullFill=false;
+  if (mag<=20)      { img=moonImg[0]; moonImgR=IMG_MOON_R[0]; }
+  else if (mag<=80) { img=moonImg[1]; moonImgR=IMG_MOON_R[1]; }
+  else              { img=moonImg[2]; useFullFill=true; }
+
+  if (mag<=20) {
+    const sc=mag/10;
+    for (const s of TELE_STARS) {
+      const sx=cx+s.nx*VR*sc, sy=cy+s.ny*VR*sc;
+      const tw=0.62+0.38*Math.sin(t*s.tw+s.tp);
+      sceneCtx.save(); sceneCtx.globalAlpha=s.bright*tw;
+      if (s.size>0.8&&s.bright>0.45) {
+        const glow=sceneCtx.createRadialGradient(sx,sy,0,sx,sy,s.size*2.5);
+        glow.addColorStop(0,'rgba(190,210,255,0.65)'); glow.addColorStop(1,'rgba(0,0,0,0)');
+        sceneCtx.beginPath(); sceneCtx.arc(sx,sy,s.size*2.5,0,Math.PI*2); sceneCtx.fillStyle=glow; sceneCtx.fill();
+      }
+      sceneCtx.beginPath(); sceneCtx.arc(sx,sy,s.size,0,Math.PI*2); sceneCtx.fillStyle='#fff'; sceneCtx.fill();
+      sceneCtx.restore();
+    }
+  }
+
+  if (img&&img.complete&&img.naturalWidth>0) {
+    let drawW, drawH;
+    if (useFullFill) {
+      const sc=Math.max((VR*2.25)/img.naturalHeight,(VR*2.25)/img.naturalWidth);
+      drawW=img.naturalWidth*sc; drawH=img.naturalHeight*sc;
+    } else {
+      const sc=moonDispR/moonImgR;
+      drawW=img.naturalWidth*sc; drawH=img.naturalHeight*sc;
+    }
+    sceneCtx.drawImage(img,cx-drawW/2,cy-drawH/2,drawW,drawH);
+  }
+}
+
+// ── White Telescope SVG  (目镜在左 / 物镜在右) ──────────
+function buildScopeSVG() {
+  const svg = document.getElementById('scope-svg');
+  const ns  = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = '';
+
+  const TW = svg.parentElement.clientWidth || 440;
+  const TH = 82;
+  svg.setAttribute('viewBox', `0 0 ${TW} ${TH}`);
+
+  const ep  = EYEPIECES.find(e => e.f === S.ep);
+  const obj = OBJECTIVES.find(o => o.f === S.obj);
+
+  // ── Geometry (eyepiece LEFT → objective RIGHT) ──
+  const midY = 43;
+  const eyeR = 12;   // eye cup radius
+  const epH  = 14;   // eyepiece barrel half-height
+  const focH = 18;   // focuser block half-height
+  const mH   = 16;   // main tube half-height
+  const objH = 24;   // objective cell half-height
+  const dewH = 27;   // dew shield half-height
+
+  const L      = TW * 0.025;          // left margin
+  const eyeCX  = L + eyeR;            // eye cup center
+  const epBSt  = eyeCX - 4;           // eyepiece barrel start
+  const epBW   = 28;
+  const epBEnd = epBSt + epBW;
+  const focW   = 24;
+  const focSt  = epBEnd;
+  const focEnd = focSt + focW;
+  const taperW = 10;                   // focuser → tube taper
+  const mainSt = focEnd + taperW;
+  const mainW  = TW * 0.50;
+  const mainEnd= mainSt + mainW;
+  const objTaperW = 10;               // tube → objective taper
+  const objBW  = 22;
+  const objSt  = mainEnd + objTaperW;
+  const objEnd = objSt + objBW;
+  const dewW   = 44;
+  const dewSt  = objEnd;
+  const dewEnd = dewSt + dewW;
+
+  const defs = document.createElementNS(ns, 'defs');
+
+  function lg(id, stops) {
+    const g = document.createElementNS(ns, 'linearGradient');
+    g.setAttribute('id',id); g.setAttribute('x1','0'); g.setAttribute('y1','0');
+    g.setAttribute('x2','0'); g.setAttribute('y2','1');
+    stops.forEach(([o,c]) => {
+      const s = document.createElementNS(ns,'stop');
+      s.setAttribute('offset',o); s.setAttribute('stop-color',c); g.appendChild(s);
+    });
+    return g;
+  }
+
+  defs.appendChild(lg('gWhiteTube',[
+    ['0%','#b8c4cc'],['8%','#d8e2ea'],['20%','#eef3f7'],['32%','#f8fbfd'],
+    ['46%','#ffffff'],['58%','#f2f6fa'],['72%','#dce5ed'],['86%','#c8d2da'],['100%','#b0bcc6']
+  ]));
+  defs.appendChild(lg('gObjBarrel',[
+    ['0%','#a8b4bc'],['12%','#c8d4dc'],['30%','#e4ecf2'],['50%','#f5f8fa'],
+    ['70%','#dce6ec'],['88%','#c4cfd8'],['100%','#a4b0b8']
+  ]));
+  defs.appendChild(lg('gDewShield',[
+    ['0%','#9aa4ae'],['15%','#c0cad4'],['38%','#d8e4ec'],
+    ['55%','#dde8f0'],['75%','#cad4de'],['100%','#94a0aa']
+  ]));
+  defs.appendChild(lg('gFocuser',[
+    ['0%','#2a3240'],['15%','#424e5e'],['32%','#5c6878'],
+    ['50%','#68788a'],['80%','#404c5c'],['100%','#28303c']
+  ]));
+  defs.appendChild(lg('gEyepiece',[
+    ['0%','#161e28'],['22%','#222e3c'],['45%','#2e3e52'],['78%','#1e2a38'],['100%','#141c26']
+  ]));
+  defs.appendChild(lg('gMetalRing',[
+    ['0%','#5a6272'],['20%','#7e8e9e'],['50%','#9aaab8'],['80%','#7c8c9c'],['100%','#555e6a']
+  ]));
+  defs.appendChild(lg('gFinder',[
+    ['0%','#1e2630'],['40%','#323c48'],['60%','#3a4450'],['100%','#1e2630']
+  ]));
+
+  svg.appendChild(defs);
+  const g = document.createElementNS(ns,'g');
+
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns,tag);
+    Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k,String(v)));
+    return e;
+  }
+
+  // ── Ground shadow ──
+  g.appendChild(el('ellipse',{
+    cx:(eyeCX+dewEnd)/2, cy:midY+mH+9,
+    rx:(dewEnd-eyeCX)*0.44, ry:5, fill:'rgba(0,0,0,0.25)'
+  }));
+
+  // ── FINDER SCOPE (top of main tube) ──
+  const fsY=midY-mH-9, fsH=5.5;
+  const fsX1=mainSt+mainW*0.18, fsX2=mainSt+mainW*0.70;
+  // Finder body
+  g.appendChild(el('rect',{x:fsX1,y:fsY-fsH,width:fsX2-fsX1,height:fsH*2,rx:fsH,fill:'url(#gFinder)',stroke:'#1a2030','stroke-width':0.7}));
+  g.appendChild(el('rect',{x:fsX1+3,y:fsY-fsH+1.2,width:fsX2-fsX1-6,height:2,rx:1,fill:'rgba(255,255,255,0.08)'}));
+  // Finder eyepiece end (LEFT side of finder)
+  g.appendChild(el('rect',{x:fsX1-12,y:fsY-fsH-2.5,width:14,height:(fsH+2.5)*2,rx:fsH+1,fill:'#181e28',stroke:'#111820','stroke-width':0.7}));
+  // Finder objective end (RIGHT side of finder)
+  g.appendChild(el('rect',{x:fsX2,y:fsY-fsH-1,width:12,height:(fsH+1)*2,rx:fsH,fill:'#1c2430',stroke:'#111820','stroke-width':0.7}));
+  // Brackets
+  [fsX1+(fsX2-fsX1)*0.25, fsX1+(fsX2-fsX1)*0.75].forEach(bx=>{
+    g.appendChild(el('rect',{x:bx-1.5,y:fsY+fsH,width:3,height:midY-mH-fsY-fsH,rx:1,fill:'#3a4858'}));
+    g.appendChild(el('rect',{x:bx-6,y:midY-mH-2,width:12,height:5,rx:2,fill:'#4a5a6a',stroke:'#2a3848','stroke-width':0.6}));
+    g.appendChild(el('circle',{cx:bx,cy:midY-mH+2,r:2,fill:'#3a4858'}));
+  });
+
+  // ── EYE CUP (leftmost) ──
+  g.appendChild(el('circle',{cx:eyeCX,cy:midY,r:eyeR,fill:'#0c1520',stroke:'#1c2e44','stroke-width':2}));
+  g.appendChild(el('circle',{cx:eyeCX,cy:midY,r:8,fill:'rgba(20,55,115,0.5)',stroke:'rgba(65,135,215,0.32)','stroke-width':0.8}));
+  g.appendChild(el('ellipse',{cx:eyeCX-3,cy:midY-5,rx:3,ry:1.6,fill:'rgba(255,255,255,0.18)'}));
+  g.appendChild(el('ellipse',{cx:eyeCX+2,cy:midY+5,rx:1.5,ry:0.9,fill:'rgba(255,255,255,0.08)'}));
+
+  // ── EYEPIECE BARREL ──
+  g.appendChild(el('rect',{x:epBSt,y:midY-epH,width:epBW,height:epH*2,rx:3,fill:'url(#gEyepiece)'}));
+  for (let i=4;i<epBW-4;i+=3) {
+    g.appendChild(el('rect',{x:epBSt+i,y:midY-epH+1.5,width:1.2,height:epH*2-3,rx:0.3,fill:'rgba(0,0,0,0.22)'}));
+  }
+  g.appendChild(el('rect',{x:epBSt+4,y:midY-epH,width:11,height:epH*2,rx:0,fill:'rgba(180,200,220,0.10)',stroke:'rgba(180,200,220,0.08)','stroke-width':0.5}));
+
+  // ── EYEPIECE LENS ELEMENTS ──
+  {
+    const epLH=epH*1.55, lx1=epBSt+epBW*0.55;
+    const ct1=ep.thick*epLH, et1=Math.max(1.5,ct1*0.10), cpR1=ct1-et1/2, ht1=epLH/2;
+    const d1=`M${lx1+et1/2},${midY-ht1} Q${lx1+cpR1},${midY} ${lx1+et1/2},${midY+ht1} L${lx1-et1/2},${midY+ht1} Q${lx1-cpR1},${midY} ${lx1-et1/2},${midY-ht1} Z`;
+    g.appendChild(el('path',{d:d1,fill:'rgba(80,165,255,0.42)',stroke:'rgba(130,215,255,0.80)','stroke-width':1.1}));
+    g.appendChild(el('path',{d:`M${lx1+et1*0.3},${midY-ht1*0.85} Q${lx1+ct1*0.45},${midY} ${lx1+et1*0.3},${midY+ht1*0.85}`,stroke:'rgba(255,255,255,0.34)','stroke-width':0.9,fill:'none'}));
+    const lx2=lx1+ct1*0.9+3, ct2=ct1*0.72, et2=et1*0.85, cpR2=ct2-et2/2, ht2=epLH*0.86/2;
+    const d2=`M${lx2+et2/2},${midY-ht2} Q${lx2+cpR2},${midY} ${lx2+et2/2},${midY+ht2} L${lx2-et2/2},${midY+ht2} Q${lx2-cpR2},${midY} ${lx2-et2/2},${midY-ht2} Z`;
+    g.appendChild(el('path',{d:d2,fill:'rgba(55,140,225,0.28)',stroke:'rgba(100,185,248,0.52)','stroke-width':0.7}));
+  }
+
+  // ── FOCUSER BODY ──
+  g.appendChild(el('rect',{x:focSt,y:midY-focH,width:focW,height:focH*2,rx:2,fill:'url(#gFocuser)'}));
+  // Rack teeth (bottom of focuser)
+  for (let i=0;i<9;i++) {
+    g.appendChild(el('rect',{x:focSt+3+i*2.4,y:midY+focH,width:1.8,height:4,rx:0.6,fill:'rgba(150,190,220,0.25)'}));
+  }
+  g.appendChild(el('rect',{x:focSt+2,y:midY-focH+1,width:focW-4,height:2,rx:1,fill:'rgba(255,255,255,0.07)'}));
+
+  // Drawtube
+  g.appendChild(el('rect',{x:focEnd-2,y:midY-focH+4,width:8,height:(focH-4)*2,rx:1,fill:'#202c3c',stroke:'#161e2a','stroke-width':0.5}));
+
+  // COARSE FOCUS KNOB
+  const ckX=focSt+focW*0.38;
+  const knob=el('ellipse',{cx:ckX,cy:midY+focH+9,rx:10,ry:7,fill:'#3a4858',stroke:'#1e2a38','stroke-width':1.5,id:'scope-knob'});
+  g.appendChild(knob);
+  for (let i=-4;i<=4;i++) { g.appendChild(el('line',{x1:ckX+i*1.6,y1:midY+focH+3,x2:ckX+i*1.6,y2:midY+focH+15,stroke:'rgba(0,0,0,0.35)','stroke-width':0.8})); }
+  g.appendChild(el('ellipse',{cx:ckX-2,cy:midY+focH+6,rx:3.5,ry:2,fill:'rgba(255,255,255,0.15)'}));
+
+  // FINE FOCUS KNOB
+  const fkX=focSt+focW*0.75;
+  const fknob=el('ellipse',{cx:fkX,cy:midY+focH+8,rx:7,ry:5,fill:'#2e3a4a',stroke:'#1a2430','stroke-width':1.2,id:'scope-knob-fine'});
+  g.appendChild(fknob);
+  g.appendChild(el('ellipse',{cx:fkX-1.5,cy:midY+focH+5.5,rx:2.5,ry:1.5,fill:'rgba(255,255,255,0.11)'}));
+
+  // ── FOCUSER → TUBE TAPER ──
+  g.appendChild(el('polygon',{
+    points:`${focEnd},${midY-focH} ${mainSt},${midY-mH} ${mainSt},${midY+mH} ${focEnd},${midY+focH}`,
+    fill:'#c0ccda'
+  }));
+
+  // ── MAIN WHITE TUBE ──
+  g.appendChild(el('rect',{x:mainSt,y:midY-mH,width:mainW,height:mH*2,rx:2,fill:'url(#gWhiteTube)'}));
+  g.appendChild(el('rect',{x:mainSt+6,y:midY-mH+1.5,width:mainW-12,height:3,rx:1.5,fill:'rgba(255,255,255,0.22)'}));
+  g.appendChild(el('rect',{x:mainSt+6,y:midY+mH-3.5,width:mainW-12,height:2,rx:1,fill:'rgba(0,0,0,0.08)'}));
+
+  // RED ACCENT STRIPE
+  const redX=mainEnd-mainW*0.15;
+  g.appendChild(el('rect',{x:redX,y:midY-mH,width:6,height:mH*2,fill:'#cc2222'}));
+  g.appendChild(el('rect',{x:redX+1,y:midY-mH,width:2,height:mH*2,fill:'rgba(255,120,120,0.35)'}));
+
+  // Tube rings
+  [mainW*0.32, mainW*0.65].forEach(dx=>{
+    const rx=mainSt+dx;
+    g.appendChild(el('rect',{x:rx-4,y:midY-mH-2,width:8,height:mH*2+4,rx:2,fill:'url(#gMetalRing)'}));
+    g.appendChild(el('rect',{x:rx-4,y:midY-mH-2,width:8,height:3,rx:1,fill:'rgba(255,255,255,0.12)'}));
+  });
+
+  // Logo label area
+  g.appendChild(el('rect',{x:mainSt+mainW*0.32,y:midY-mH+5,width:mainW*0.26,height:mH*2-10,rx:2,fill:'rgba(255,255,255,0.04)',stroke:'rgba(255,255,255,0.05)','stroke-width':0.5}));
+
+  // ── TUBE → OBJECTIVE TAPER ──
+  g.appendChild(el('polygon',{
+    points:`${mainEnd},${midY-mH} ${objSt},${midY-objH} ${objSt},${midY+objH} ${mainEnd},${midY+mH}`,
+    fill:'#c8d4dc'
+  }));
+  g.appendChild(el('polygon',{
+    points:`${mainEnd},${midY-mH} ${objSt},${midY-objH} ${objSt},${midY-objH+4} ${mainEnd},${midY-mH+3}`,
+    fill:'rgba(255,255,255,0.18)'
+  }));
+
+  // ── OBJECTIVE CELL ──
+  g.appendChild(el('rect',{x:objSt,y:midY-objH,width:objBW,height:objH*2,rx:3,fill:'url(#gObjBarrel)'}));
+  [6,14].forEach(dx=>{
+    g.appendChild(el('rect',{x:objSt+dx,y:midY-objH,width:2.5,height:objH*2,fill:'rgba(0,0,0,0.10)',rx:0.5}));
+  });
+
+  // Objective doublet (visible at LEFT edge of cell, facing main tube)
+  {
+    const lx=objSt+8, lh=objH*1.65;
+    const ct=obj.thick*lh, et=Math.max(2,ct*0.11), cpR=ct-et/2, ht=lh/2;
+    const d=`M${lx+et/2},${midY-ht} Q${lx+cpR},${midY} ${lx+et/2},${midY+ht} L${lx-et/2},${midY+ht} Q${lx-cpR},${midY} ${lx-et/2},${midY-ht} Z`;
+    g.appendChild(el('path',{d,fill:'rgba(80,165,255,0.45)',stroke:'rgba(140,220,255,0.85)','stroke-width':1.3}));
+    g.appendChild(el('path',{d:`M${lx+et*0.3},${midY-ht*0.82} Q${lx+ct*0.44},${midY} ${lx+et*0.3},${midY+ht*0.82}`,stroke:'rgba(255,255,255,0.38)','stroke-width':1.0,fill:'none'}));
+    const lx2=lx+ct+3, ct2=ct*0.6, et2=et*0.8, cpR2=ct2-et2/2;
+    const d2=`M${lx2+et2/2},${midY-ht} Q${lx2+cpR2},${midY} ${lx2+et2/2},${midY+ht} L${lx2-et2/2},${midY+ht} Q${lx2-cpR2},${midY} ${lx2-et2/2},${midY-ht} Z`;
+    g.appendChild(el('path',{d:d2,fill:'rgba(50,130,220,0.28)',stroke:'rgba(100,185,245,0.55)','stroke-width':0.7}));
+  }
+
+  // ── DEW SHIELD (rightmost, widest) ──
+  g.appendChild(el('rect',{x:dewSt,y:midY-dewH,width:dewW,height:dewH*2,rx:5,fill:'url(#gDewShield)'}));
+  // Front opening (RIGHT end)
+  g.appendChild(el('rect',{x:dewEnd-5,y:midY-dewH,width:5,height:dewH*2,rx:3,fill:'rgba(0,0,0,0.35)'}));
+  [10,22,34].forEach(dx=>{
+    g.appendChild(el('rect',{x:dewSt+dx,y:midY-dewH,width:2.5,height:dewH*2,fill:'rgba(0,0,0,0.12)',rx:0.5}));
+  });
+  // Objective glass visible at RIGHT opening
+  g.appendChild(el('ellipse',{cx:dewEnd-3,cy:midY,rx:3.5,ry:dewH-4,fill:'rgba(20,70,140,0.55)',stroke:'rgba(60,140,220,0.4)','stroke-width':0.8}));
+  g.appendChild(el('ellipse',{cx:dewEnd-4.5,cy:midY-8,rx:1.6,ry:1,fill:'rgba(255,255,255,0.18)'}));
+
+  // ── INTERNAL LIGHT PATH ──
+  g.appendChild(el('line',{x1:eyeCX+eyeR+2,y1:midY,x2:dewEnd-6,y2:midY,stroke:'rgba(100,190,255,0.07)','stroke-width':1,'stroke-dasharray':'8,7'}));
+
+  // ── Naked-eye dim overlay ──
+  if (S.mode==='naked') {
+    g.appendChild(el('rect',{x:L,y:0,width:dewEnd-L+8,height:TH,fill:'rgba(0,0,0,0.60)',rx:5}));
+    const dimTxt=document.createElementNS(ns,'text');
+    dimTxt.setAttribute('x',String((eyeCX+dewEnd)/2));
+    dimTxt.setAttribute('y',String(midY+5));
+    dimTxt.setAttribute('text-anchor','middle');
+    dimTxt.setAttribute('font-size','12');
+    dimTxt.setAttribute('font-family','PingFang SC,Microsoft YaHei,sans-serif');
+    dimTxt.setAttribute('fill','rgba(167,139,250,0.45)');
+    dimTxt.textContent='望远镜未使用';
+    g.appendChild(dimTxt);
+  }
+
+  svg.appendChild(g);
+}
+
+// ── Lens Card UI (no numbers) ────────────────────────
+function lensCardSVG(focal, thick, h, isEp) {
+  const ct = thick*h, et = Math.max(2.0,ct*0.10), cpR = ct-et/2, ht = h/2;
+  const vw = Math.max(ct*2+10, 22), vcx = vw/2;
+  const d  = `M${vcx+et/2},2 Q${vcx+cpR},${h/2+2} ${vcx+et/2},${h+2} L${vcx-et/2},${h+2} Q${vcx-cpR},${h/2+2} ${vcx-et/2},2 Z`;
+  const gid = `lg_${isEp?'e':'o'}_${focal}`;
+  return `<svg width="${vw}" height="${h+4}" viewBox="0 0 ${vw} ${h+4}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%"   stop-color="rgba(40,100,185,0.58)"/>
+        <stop offset="45%"  stop-color="rgba(120,200,255,0.70)"/>
+        <stop offset="100%" stop-color="rgba(40,100,185,0.58)"/>
+      </linearGradient>
+    </defs>
+    <path d="${d}" fill="url(#${gid})" stroke="rgba(110,190,255,0.48)" stroke-width="0.8"/>
+  </svg>`;
+}
+
+function buildLensCards() {
+  const epCon  = document.getElementById('ep-options');
+  const objCon = document.getElementById('obj-options');
+  epCon.innerHTML = objCon.innerHTML = '';
+  const disabled = S.mode === 'naked';
+
+  EYEPIECES.forEach(ep => {
+    const card = document.createElement('div');
+    card.className = 'lens-card' + (ep.f===S.ep?' selected':'') + (disabled?' disabled':'');
+    card.innerHTML = lensCardSVG(ep.f, ep.thick, 26, true);
+    if (!disabled) card.addEventListener('click', () => changeLens('ep', ep.f));
+    epCon.appendChild(card);
+  });
+
+  OBJECTIVES.forEach(ob => {
+    const card = document.createElement('div');
+    card.className = 'lens-card' + (ob.f===S.obj?' selected':'') + (disabled?' disabled':'');
+    card.innerHTML = lensCardSVG(ob.f, ob.thick, 34, false);
+    if (!disabled) card.addEventListener('click', () => changeLens('obj', ob.f));
+    objCon.appendChild(card);
+  });
+}
+
+// ── Mode / Lens Changes ───────────────────────────────
+function setMode(mode) {
+  if (S.mode === mode) return;
+  S.mode = mode;
+  S.focused  = mode === 'naked';
+  S.focusing = false;
+  S.blur     = mode === 'naked' ? 0 : (S.focused ? 0 : 12);
+
+  document.getElementById('mode-scope-btn').classList.toggle('active', mode==='scope');
+  document.getElementById('mode-naked-btn').classList.toggle('active', mode==='naked');
+
+  const btn = document.getElementById('focus-btn');
+  if (mode === 'naked') {
+    btn.disabled = true;
+    document.getElementById('focus-icon').textContent  = '—';
+    document.getElementById('focus-label').textContent = '无需对焦';
+  } else {
+    btn.disabled = false;
+    document.getElementById('focus-icon').textContent  = '⊙';
+    document.getElementById('focus-label').textContent = '自动对焦';
+    S.focused = false; S.blur = 12;
+  }
+
+  updateStatus();
+  buildLensCards();
+  buildScopeSVG();
+  drawOverlay();
+}
+
+function changeLens(type, val) {
+  if (type==='ep') S.ep=val; else S.obj=val;
+  S.focused=false; S.focusing=false; S.blur=12;
+  const icon = document.getElementById('focus-icon');
+  icon.className=''; icon.textContent='⊙';
+  document.getElementById('focus-label').textContent='自动对焦';
+  document.getElementById('focus-btn').disabled=false;
+  updateStatus(); buildLensCards(); buildScopeSVG();
+}
+
+function updateStatus() {
+  const dot  = document.getElementById('focus-dot');
+  const ftxt = document.getElementById('focus-text');
+  if (S.mode==='naked'||S.focused) {
+    dot.classList.add('on'); ftxt.textContent = S.mode==='naked' ? '肉眼' : '已对焦';
+  } else {
+    dot.classList.remove('on'); ftxt.textContent = S.focusing ? '对焦中…' : '未对焦';
+  }
+}
+
+// ── Auto-Focus ────────────────────────────────────────
+function triggerFocus() {
+  if (S.focusing || S.mode==='naked') return;
+  S.focusing=true; S.focused=false;
+
+  const btn  = document.getElementById('focus-btn');
+  const icon = document.getElementById('focus-icon');
+  const lbl  = document.getElementById('focus-label');
+  btn.disabled=true;
+  icon.className='spin-icon'; icon.textContent='◎';
+  lbl.textContent='对焦中…';
+  updateStatus();
+  showPulseRing();
+  animateKnob();
+
+  const t0=performance.now(), dur=1900, startBlur=S.blur;
+  (function step(now) {
+    const t    = Math.min(1,(now-t0)/dur);
+    const ease = 1-Math.pow(1-t,3);
+    S.blur = startBlur*(1-ease);
+    if (t<1) { requestAnimationFrame(step); }
+    else {
+      S.blur=0; S.focused=true; S.focusing=false;
+      btn.disabled=false; icon.className=''; icon.textContent='✓'; lbl.textContent='对焦成功';
+      updateStatus();
+      setTimeout(()=>{ icon.textContent='⊙'; lbl.textContent='自动对焦'; },2800);
+    }
+  })(performance.now());
+}
+
+function animateKnob() {
+  const knob=document.getElementById('scope-knob');
+  const fine=document.getElementById('scope-knob-fine');
+  if (!knob) return;
+  const bx=parseFloat(knob.getAttribute('cx'));
+  const t0=performance.now();
+  (function step(now) {
+    const t=Math.min(1,(now-t0)/1900);
+    const w=Math.sin(t*Math.PI*12)*6*(1-t);
+    knob.setAttribute('cx',String(bx+w));
+    if (fine) fine.setAttribute('cx',String(parseFloat(fine.getAttribute('cx'))+w*0.4));
+    if (t<1) requestAnimationFrame(step); else knob.setAttribute('cx',String(bx));
+  })(performance.now());
+}
+
+function showPulseRing() {
+  const sec=document.getElementById('view-section');
+  const ring=document.createElement('div');
+  ring.className='focus-ring-anim';
+  const sz=VR*0.82;
+  Object.assign(ring.style,{ width:`${sz*2}px`, height:`${sz*2}px`, left:`${CW/2-sz}px`, top:`${CH/2-sz}px` });
+  sec.appendChild(ring);
+  setTimeout(()=>ring.remove(),950);
+}
+
+// ── Init ──────────────────────────────────────────────
+function init() {
+  resizeCanvases();
+  buildLensCards();
+  buildScopeSVG();
+  updateStatus();
+  requestAnimationFrame(renderScene);
+}
+
+window.addEventListener('resize', ()=>{ resizeCanvases(); buildScopeSVG(); });
+if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else init();
+</script>
+</body>
+</html>
