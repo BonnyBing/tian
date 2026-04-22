@@ -138,7 +138,7 @@ header {
 
 /* Lens selector rows */
 .lens-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 2px 0; }
-.row-label { font-size: 0.63rem; color: #374151; width: 24px; text-align: center; flex-shrink: 0; line-height: 1.3; }
+.row-label { font-size: 0.55rem; color: #374151; width: 36px; text-align: center; flex-shrink: 0; line-height: 1.3; }
 .lens-options { display: flex; gap: 4px; flex: 1; }
 .lens-card {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -206,19 +206,19 @@ header {
 
   <!-- Eyepiece selector (no numbers) -->
   <div class="lens-row">
-    <div class="row-label">目<br>镜</div>
+    <div class="row-label" style="width:36px;white-space:nowrap">目<br>镜</div>
     <div class="lens-options" id="ep-options"></div>
   </div>
 
   <!-- Objective selector (no numbers) -->
   <div class="lens-row">
-    <div class="row-label">物<br>镜</div>
+    <div class="row-label" style="width:36px;white-space:nowrap">物镜一组</div>
     <div class="lens-options" id="obj-options"></div>
   </div>
 
   <!-- Aperture selector (800mm, same thickness, different size) -->
   <div class="lens-row">
-    <div class="row-label"></div>
+    <div class="row-label" style="width:36px;white-space:nowrap">物镜二组</div>
     <div class="lens-options" id="apt-options"></div>
   </div>
 
@@ -754,10 +754,12 @@ function buildLensCards() {
   });
 
   // 口径行：800mm 同焦距，不同口径大小，厚度一致
+  // 保证所有口径卡片 thick×cardH 恒定（= S 的基准值），视觉厚度相同
+  const _baseCt = APERTURES[0].thick * APERTURES[0].cardH;
   APERTURES.forEach(ap => {
     const card = document.createElement('div');
     card.className = 'lens-card' + (S.aperture===ap.id?' selected':'') + (disabled?' disabled':'');
-    card.innerHTML = lensCardSVG(800, ap.thick, ap.cardH, false);
+    card.innerHTML = lensCardSVG(800, _baseCt / ap.cardH, ap.cardH, false);
     if (!disabled) card.addEventListener('click', () => changeAperture(ap.id));
     aptCon.appendChild(card);
   });
