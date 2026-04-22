@@ -247,8 +247,8 @@ const OBJECTIVES = [
 // S 的 cardH=32 与物镜行 800mm 完全一致
 const APERTURES = [
   { id: 'S', label: '小口径', thick: 0.10, cardH: 32, objH: 22, dewH: 26 },
-  { id: 'M', label: '中口径', thick: 0.10, cardH: 44, objH: 30, dewH: 34 },
-  { id: 'L', label: '大口径', thick: 0.10, cardH: 58, objH: 38, dewH: 42 },
+  { id: 'M', label: '中口径', thick: 0.10, cardH: 40, objH: 29, dewH: 33 },
+  { id: 'L', label: '大口径', thick: 0.10, cardH: 48, objH: 36, dewH: 40 },
 ];
 
 // ── State ────────────────────────────────────────────
@@ -287,8 +287,7 @@ function resizeCanvases() {
   CW = sec.clientWidth; CH = sec.clientHeight;
   sceneCvs.width = overlayCvs.width = CW;
   sceneCvs.height = overlayCvs.height = CH;
-  // 留出顶底各约 8% 的边距，圆圈不贴观察区边缘
-  VR = Math.min(Math.min(CW, CH * 0.84) * 0.43, 260);
+  VR = Math.min(Math.min(CW, CH) * 0.43, 280);
   drawOverlay();
 }
 
