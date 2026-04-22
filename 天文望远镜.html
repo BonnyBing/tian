@@ -38,7 +38,8 @@ header {
 
 /* ── View Section ── */
 #view-section {
-  flex: 1; min-height: 0;
+  flex: 1 1 0%;   /* 拿走底部面板之外的全部剩余高度 */
+  min-height: 0;
   position: relative;
   background: #000;
   overflow: hidden;
@@ -63,48 +64,67 @@ header {
 
 /* ── Scope Section ── */
 #scope-section {
-  flex-shrink: 0;
-  height: clamp(232px, 43vh, 300px);
+  flex: 0 0 auto;           /* 不参与伸缩，固定由内容决定高度 */
+  /* 内容约 235px；小屏超出时内部可滚动 */
+  max-height: 50vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: linear-gradient(180deg, #060e1a 0%, #0a1525 100%);
   border-top: 1px solid rgba(255,255,255,0.06);
-  padding: 7px 13px 5px;
+  padding: 4px 13px 4px;
   display: flex; flex-direction: column; gap: 0;
-  overflow: hidden;
 }
 
-/* ── Focus button (top of scope section) ── */
-.focus-top {
-  flex-shrink: 0;
-  margin-bottom: 6px;
+/* ── Scope main row: SVG left + controls right ── */
+.scope-main-row {
+  display: flex; align-items: center; gap: 4px;
+  flex-shrink: 0; margin-bottom: 2px;
 }
+
+/* Telescope wrap */
+.scope-wrap {
+  flex: 1; min-width: 0; height: 66px;
+}
+.scope-wrap svg { overflow: visible; display: block; }
+
+/* Controls column (right of SVG) */
+.scope-ctrl {
+  flex-shrink: 0;
+  width: clamp(110px, 22vw, 160px);   /* 小屏不挤压望远镜 SVG */
+  display: flex; flex-direction: column; gap: 5px;
+  align-self: stretch; justify-content: center;
+}
+
+/* ── Focus button ── */
 .focus-btn {
   width: 100%;
-  padding: 7px 12px;
+  padding: 4px 8px;
   background: linear-gradient(135deg, #1d4ed8, #6d28d9);
-  border: none; border-radius: 8px; color: #fff;
-  font-size: 0.76rem; font-weight: 600; cursor: pointer;
+  border: none; border-radius: 7px; color: #fff;
+  font-size: 0.70rem; font-weight: 600; cursor: pointer;
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
   white-space: nowrap;
-  box-shadow: 0 2px 10px rgba(29,78,216,0.35);
+  box-shadow: 0 2px 8px rgba(29,78,216,0.35);
   letter-spacing: 0.02em;
 }
-.focus-btn:hover:not(:disabled) { opacity: 0.9; box-shadow: 0 4px 14px rgba(29,78,216,0.5); }
+.focus-btn:hover:not(:disabled) { opacity: 0.9; }
 .focus-btn:active:not(:disabled) { transform: scale(0.99); }
 .focus-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 
 /* ── Mode toggle ── */
 .mode-row {
-  display: flex; gap: 6px;
-  flex-shrink: 0; margin-bottom: 5px;
+  display: flex; flex-direction: column; gap: 3px;
+  flex-shrink: 0;
 }
 .mode-btn {
-  flex: 1; padding: 5px 8px;
+  width: 100%; padding: 4px 6px;
   background: rgba(255,255,255,0.04);
   border: 1.5px solid rgba(255,255,255,0.08);
-  border-radius: 7px; color: #4b5563;
-  font-size: 0.70rem; font-weight: 600;
+  border-radius: 6px; color: #4b5563;
+  font-size: 0.67rem; font-weight: 600;
   cursor: pointer; transition: all 0.18s;
+  white-space: nowrap;
 }
 .mode-btn:hover { background: rgba(255,255,255,0.07); color: #94a3b8; }
 .mode-btn.active {
@@ -113,14 +133,8 @@ header {
   box-shadow: 0 0 10px rgba(96,165,250,0.15);
 }
 
-/* Telescope wrap */
-.scope-wrap {
-  flex-shrink: 0; height: 82px; width: 100%;
-}
-.scope-wrap svg { overflow: visible; display: block; }
-
 /* Separator */
-.sep { height: 1px; background: rgba(255,255,255,0.06); flex-shrink: 0; margin: 5px 0; }
+.sep { height: 1px; background: rgba(255,255,255,0.06); flex-shrink: 0; margin: 2px 0; }
 
 /* Lens selector rows */
 .lens-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 2px 0; }
@@ -171,23 +185,21 @@ header {
 
 <div id="scope-section">
 
-  <!-- Auto-focus button (topmost) -->
-  <div class="focus-top">
-    <button class="focus-btn" id="focus-btn" onclick="triggerFocus()">
-      <span id="focus-icon">⊙</span>
-      <span id="focus-label">自动对焦</span>
-    </button>
-  </div>
-
-  <!-- Mode toggle -->
-  <div class="mode-row">
-    <button class="mode-btn active" id="mode-scope-btn" onclick="setMode('scope')">🔭 望远镜</button>
-    <button class="mode-btn" id="mode-naked-btn" onclick="setMode('naked')">👁 肉眼观察</button>
-  </div>
-
-  <!-- Telescope SVG -->
-  <div class="scope-wrap">
-    <svg id="scope-svg" width="100%" height="82" xmlns="http://www.w3.org/2000/svg"></svg>
+  <!-- Telescope SVG (left) + Controls (right) -->
+  <div class="scope-main-row">
+    <div class="scope-wrap">
+      <svg id="scope-svg" width="100%" height="66" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="scope-ctrl">
+      <button class="focus-btn" id="focus-btn" onclick="triggerFocus()">
+        <span id="focus-icon">⊙</span>
+        <span id="focus-label">自动对焦</span>
+      </button>
+      <div class="mode-row">
+        <button class="mode-btn active" id="mode-scope-btn" onclick="setMode('scope')">🔭 望远镜</button>
+        <button class="mode-btn" id="mode-naked-btn" onclick="setMode('naked')">👁 肉眼观察</button>
+      </div>
+    </div>
   </div>
 
   <div class="sep"></div>
@@ -202,6 +214,12 @@ header {
   <div class="lens-row">
     <div class="row-label">物<br>镜</div>
     <div class="lens-options" id="obj-options"></div>
+  </div>
+
+  <!-- Aperture selector (800mm, same thickness, different size) -->
+  <div class="lens-row">
+    <div class="row-label"></div>
+    <div class="lens-options" id="apt-options"></div>
   </div>
 
 </div>
@@ -225,11 +243,19 @@ const OBJECTIVES = [
   { f: 400, kind: '中焦', thick: 0.22 },  // 400mm 中等
   { f: 800, kind: '长焦', thick: 0.10 }   // 800mm 焦距最长 → 最薄
 ];
+// 800mm 物镜不同口径（厚度一致，大小递增）
+// S 的 cardH=32 与物镜行 800mm 完全一致
+const APERTURES = [
+  { id: 'S', label: '小口径', thick: 0.10, cardH: 32, objH: 22, dewH: 26 },
+  { id: 'M', label: '中口径', thick: 0.10, cardH: 44, objH: 30, dewH: 34 },
+  { id: 'L', label: '大口径', thick: 0.10, cardH: 58, objH: 38, dewH: 42 },
+];
 
 // ── State ────────────────────────────────────────────
 const S = {
-  ep:      20,
-  obj:     200,
+  ep:       20,
+  obj:      200,
+  aperture: null,   // null = 使用焦距行；'S'/'M'/'L' = 口径行选中
   mode:    'scope',
   focused: false,
   focusing: false,
@@ -261,7 +287,8 @@ function resizeCanvases() {
   CW = sec.clientWidth; CH = sec.clientHeight;
   sceneCvs.width = overlayCvs.width = CW;
   sceneCvs.height = overlayCvs.height = CH;
-  VR = Math.min(Math.min(CW, CH) * 0.43, 280);
+  // 留出顶底各约 8% 的边距，圆圈不贴观察区边缘
+  VR = Math.min(Math.min(CW, CH * 0.84) * 0.43, 260);
   drawOverlay();
 }
 
@@ -439,20 +466,24 @@ function buildScopeSVG() {
   svg.innerHTML = '';
 
   const TW = svg.parentElement.clientWidth || 440;
-  const TH = 82;
+  const TH = 66;
   svg.setAttribute('viewBox', `0 0 ${TW} ${TH}`);
 
   const ep  = EYEPIECES.find(e => e.f === S.ep);
   const obj = OBJECTIVES.find(o => o.f === S.obj);
 
   // ── Geometry (eyepiece LEFT → objective RIGHT) ──
-  const midY = 43;
-  const eyeR = 12;   // eye cup radius
-  const epH  = 14;   // eyepiece barrel half-height
-  const focH = 18;   // focuser block half-height
-  const mH   = 16;   // main tube half-height
-  const objH = 24;   // objective cell half-height
-  const dewH = 27;   // dew shield half-height
+  const midY = 33;
+  const eyeR = 9;    // eye cup radius
+  const epH  = 10;   // eyepiece barrel half-height
+  const focH = 13;   // focuser block half-height
+  const mH   = 12;   // main tube half-height
+  // 口径行选中时使用对应尺寸，否则使用默认值
+  const aptData = S.aperture ? APERTURES.find(a => a.id === S.aperture) : null;
+  // 口径行选中时用对应尺寸；选 800mm 物镜但未选口径时用 S 尺寸，与物镜行外形一致
+  const _apt0 = APERTURES[0];
+  const objH = aptData ? aptData.objH : (S.obj === 800 ? _apt0.objH : 20);
+  const dewH = aptData ? aptData.dewH : (S.obj === 800 ? _apt0.dewH : 24);
 
   const L      = TW * 0.025;          // left margin
   const eyeCX  = L + eyeR;            // eye cup center
@@ -700,24 +731,47 @@ function lensCardSVG(focal, thick, h, isEp) {
 function buildLensCards() {
   const epCon  = document.getElementById('ep-options');
   const objCon = document.getElementById('obj-options');
-  epCon.innerHTML = objCon.innerHTML = '';
+  const aptCon = document.getElementById('apt-options');
+  epCon.innerHTML = objCon.innerHTML = aptCon.innerHTML = '';
   const disabled = S.mode === 'naked';
 
   EYEPIECES.forEach(ep => {
     const card = document.createElement('div');
     card.className = 'lens-card' + (ep.f===S.ep?' selected':'') + (disabled?' disabled':'');
-    card.innerHTML = lensCardSVG(ep.f, ep.thick, 26, true);
+    card.innerHTML = lensCardSVG(ep.f, ep.thick, 20, true);
     if (!disabled) card.addEventListener('click', () => changeLens('ep', ep.f));
     epCon.appendChild(card);
   });
 
   OBJECTIVES.forEach(ob => {
     const card = document.createElement('div');
-    card.className = 'lens-card' + (ob.f===S.obj?' selected':'') + (disabled?' disabled':'');
-    card.innerHTML = lensCardSVG(ob.f, ob.thick, 34, false);
+    // 口径行有选中时，物镜行无选中高亮
+    const sel = !S.aperture && ob.f === S.obj;
+    card.className = 'lens-card' + (sel?' selected':'') + (disabled?' disabled':'');
+    card.innerHTML = lensCardSVG(ob.f, ob.thick, 32, false);
     if (!disabled) card.addEventListener('click', () => changeLens('obj', ob.f));
     objCon.appendChild(card);
   });
+
+  // 口径行：800mm 同焦距，不同口径大小，厚度一致
+  APERTURES.forEach(ap => {
+    const card = document.createElement('div');
+    card.className = 'lens-card' + (S.aperture===ap.id?' selected':'') + (disabled?' disabled':'');
+    card.innerHTML = lensCardSVG(800, ap.thick, ap.cardH, false);
+    if (!disabled) card.addEventListener('click', () => changeAperture(ap.id));
+    aptCon.appendChild(card);
+  });
+}
+
+function changeAperture(id) {
+  S.aperture = id;
+  S.obj = 800;  // 口径行均为 800mm 焦距
+  S.focused = false; S.focusing = false; S.blur = 12;
+  const icon = document.getElementById('focus-icon');
+  icon.className = ''; icon.textContent = '⊙';
+  document.getElementById('focus-label').textContent = '自动对焦';
+  document.getElementById('focus-btn').disabled = false;
+  updateStatus(); buildLensCards(); buildScopeSVG();
 }
 
 // ── Mode / Lens Changes ───────────────────────────────
@@ -727,6 +781,7 @@ function setMode(mode) {
   S.focused  = mode === 'naked';
   S.focusing = false;
   S.blur     = mode === 'naked' ? 0 : (S.focused ? 0 : 12);
+  if (mode === 'naked') S.aperture = null;
 
   document.getElementById('mode-scope-btn').classList.toggle('active', mode==='scope');
   document.getElementById('mode-naked-btn').classList.toggle('active', mode==='naked');
@@ -750,7 +805,7 @@ function setMode(mode) {
 }
 
 function changeLens(type, val) {
-  if (type==='ep') S.ep=val; else S.obj=val;
+  if (type==='ep') S.ep=val; else { S.obj=val; S.aperture=null; }
   S.focused=false; S.focusing=false; S.blur=12;
   const icon = document.getElementById('focus-icon');
   icon.className=''; icon.textContent='⊙';
@@ -826,11 +881,14 @@ function showPulseRing() {
 
 // ── Init ──────────────────────────────────────────────
 function init() {
-  resizeCanvases();
   buildLensCards();
   buildScopeSVG();
   updateStatus();
-  requestAnimationFrame(renderScene);
+  // 等 flex 布局完成后再测量 view-section 高度，确保 canvas 尺寸正确
+  requestAnimationFrame(() => {
+    resizeCanvases();
+    requestAnimationFrame(renderScene);
+  });
 }
 
 window.addEventListener('resize', ()=>{ resizeCanvases(); buildScopeSVG(); });
